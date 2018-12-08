@@ -249,13 +249,13 @@ sidebar model =
         [ height fill, spacing 8 ]
         [ el [ Font.size 40 ] <| text "lights out"
         , Input.button [] { onPress = Just NewGame, label = text "new game" }
-        , text "source code"
         , stats model
 
         -- TODO: add credits
         -- , Input.button [] { onPress = Nothing, label = text "credits" }
         -- TODO: add user auth
         --, Input.button [ alignBottom ] { onPress = Nothing, label = text "sign in" }
+        -- TODO: add link to source
         ]
 
 
