@@ -12,6 +12,8 @@ import Html exposing (Html)
 import List.Extra
 import Matrix exposing (Matrix)
 import Random
+import Task
+import Time exposing (..)
 
 
 main : Program () Model Msg
@@ -43,6 +45,8 @@ type alias Model =
     , board : Board
     , numSeedMoves : Int
     , numMovesMade : Int
+    , startTime : Posix
+    , currentTime : Posix
     }
 
 
@@ -57,6 +61,8 @@ initialModel =
     , board = initialBoard
     , numSeedMoves = 0
     , numMovesMade = 0
+    , startTime = millisToPosix 0
+    , currentTime = millisToPosix 0
     }
 
 
@@ -73,6 +79,8 @@ type Msg
     = ToggleLight Int Int
     | NewGame
     | SeedBoard (List ( Int, Int ))
+    | UpdateCurrentTime Posix
+    | UpdateStartTime Posix
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -102,13 +110,29 @@ update msg model =
                 , gameState = Playing
                 , numSeedMoves = List.length coordList
               }
-            , Cmd.none
+            , getStartTime
             )
 
         NewGame ->
             ( { initialModel | gameState = Setup }
             , Random.generate SeedBoard (coordListGenerator model.board)
             )
+
+        UpdateCurrentTime currentTime ->
+            case model.gameState of
+                Playing ->
+                    ( { model | currentTime = currentTime }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        UpdateStartTime startTime ->
+            ( { model | startTime = startTime }, Cmd.none )
+
+
+getStartTime : Cmd Msg
+getStartTime =
+    Time.now |> Task.perform UpdateStartTime
 
 
 getGameState : Board -> GameState
@@ -183,7 +207,7 @@ coordGenerator maxX maxY =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    every 100 UpdateCurrentTime
 
 
 
@@ -225,6 +249,7 @@ sidebar model =
         [ height fill, spacing 8 ]
         [ el [ Font.size 40 ] <| text "lights out"
         , Input.button [] { onPress = Just NewGame, label = text "new game" }
+        , text "source code"
         , stats model
 
         -- TODO: add credits
@@ -259,17 +284,32 @@ haiku =
         ]
 
 
-
--- TODO: add stats
-
-
 stats : Model -> Element Msg
 stats model =
     column
         [ alignBottom, spacing 8 ]
         [ text <| "moves:" ++ String.fromInt model.numMovesMade
         , text <| "goal:" ++ String.fromInt model.numSeedMoves
+        , timer model
         ]
+
+
+timer : Model -> Element Msg
+timer model =
+    let
+        timeDiff =
+            posixToMillis model.currentTime
+                - posixToMillis model.startTime
+                |> millisToPosix
+    in
+    (String.padLeft 2 '0' <| String.fromInt (toHour utc timeDiff))
+        ++ ":"
+        ++ (String.padLeft 2 '0' <| String.fromInt (toMinute utc timeDiff))
+        ++ ":"
+        ++ (String.padLeft 2 '0' <| String.fromInt (toSecond utc timeDiff))
+        ++ "."
+        ++ String.fromInt (toMillis utc timeDiff // 100)
+        |> text
 
 
 rows : Matrix a -> List (List a)
