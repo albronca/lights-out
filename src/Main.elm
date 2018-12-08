@@ -1,21 +1,25 @@
 module Main exposing (main)
 
 import Array
-import Browser exposing (sandbox)
+import Browser
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events exposing (onClick)
+import Element.Events as Events
+import Element.Font as Font
 import Html exposing (Html)
+import List.Extra
 import Matrix exposing (Matrix)
+import Random
 
 
 main : Program () Model Msg
 main =
-    sandbox
+    Browser.element
         { init = init
         , update = update
         , view = view
+        , subscriptions = always Sub.none
         }
 
 
@@ -27,9 +31,14 @@ type alias Model =
     Matrix Bool
 
 
-init : Model
-init =
-    Matrix.repeat 5 5 True
+initialModel : Model
+initialModel =
+    Matrix.repeat 5 5 False
+
+
+init : () -> ( Model, Cmd Msg )
+init flags =
+    ( initialModel, Cmd.none )
 
 
 
@@ -38,34 +47,73 @@ init =
 
 type Msg
     = ToggleLight Int Int
+    | NewGame
+    | ToggleLights (List ( Int, Int ))
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ToggleLight toggleX toggleY ->
-            Matrix.indexedMap (toggleLight toggleX toggleY) model
+            ( toggleLight ( toggleX, toggleY ) model, Cmd.none )
+
+        ToggleLights coordList ->
+            ( toggleLights coordList model, Cmd.none )
+
+        NewGame ->
+            ( initialModel, Random.generate ToggleLights (coordListGenerator model) )
 
 
-toggleLight : Int -> Int -> Int -> Int -> Bool -> Bool
-toggleLight toggleX toggleY lightX lightY isOn =
-    if lightX == toggleX && lightY == toggleY then
-        not isOn
+toggleLight : ( Int, Int ) -> Model -> Model
+toggleLight ( toggleX, toggleY ) =
+    Matrix.indexedMap
+        (\lightX lightY isOn ->
+            if lightX == toggleX && lightY == toggleY then
+                not isOn
 
-    else if lightX == toggleX && lightY == toggleY - 1 then
-        not isOn
+            else if lightX == toggleX && lightY == toggleY - 1 then
+                not isOn
 
-    else if lightX == toggleX && lightY == toggleY + 1 then
-        not isOn
+            else if lightX == toggleX && lightY == toggleY + 1 then
+                not isOn
 
-    else if lightX == toggleX - 1 && lightY == toggleY then
-        not isOn
+            else if lightX == toggleX - 1 && lightY == toggleY then
+                not isOn
 
-    else if lightX == toggleX + 1 && lightY == toggleY then
-        not isOn
+            else if lightX == toggleX + 1 && lightY == toggleY then
+                not isOn
 
-    else
-        isOn
+            else
+                isOn
+        )
+
+
+toggleLights : List ( Int, Int ) -> Model -> Model
+toggleLights coordList model =
+    coordList
+        |> List.foldl toggleLight model
+
+
+coordListGenerator : Matrix a -> Random.Generator (List ( Int, Int ))
+coordListGenerator matrix =
+    let
+        ( width, height ) =
+            ( Matrix.width matrix, Matrix.height matrix )
+
+        ( maxX, maxY ) =
+            ( width - 1, height - 1 )
+
+        maxCount =
+            width * height
+    in
+    Random.int 0 maxCount
+        |> Random.andThen (\len -> Random.list len (coordGenerator maxX maxY))
+        |> Random.map List.Extra.unique
+
+
+coordGenerator : Int -> Int -> Random.Generator ( Int, Int )
+coordGenerator maxX maxY =
+    Random.pair (Random.int 0 maxX) (Random.int 0 maxY)
 
 
 
@@ -74,11 +122,36 @@ toggleLight toggleX toggleY lightX lightY isOn =
 
 view : Model -> Html Msg
 view model =
+    Element.layout
+        [ Background.color darkGray
+        , Font.color brightGreen
+        , Font.size 16
+        , Font.family
+            [ Font.typeface "Courier"
+            , Font.monospace
+            ]
+        ]
+        (row
+            [ width fill, centerY ]
+            [ gameBoard model ]
+        )
+
+
+menu : Element Msg
+menu =
+    column
+        [ alignTop, paddingXY 32 0 ]
+        [ el [ Font.size 32 ] <| text "lights out"
+        , el [ Events.onClick NewGame ] <| text "new game"
+        ]
+
+
+gameBoard : Model -> Element Msg
+gameBoard model =
     model
         |> rows
         |> List.indexedMap lightButtonRow
-        |> column [ centerX, centerY, spacing 8 ]
-        |> Element.layout [ Background.color darkGray ]
+        |> column [ centerX, spacing 8, onLeft menu ]
 
 
 rows : Matrix a -> List (List a)
@@ -91,7 +164,7 @@ rows matrix =
 
 lightButtonRow : Int -> List Bool -> Element Msg
 lightButtonRow y =
-    List.indexedMap (lightButton y) >> row [ centerX, spacing 8 ]
+    List.indexedMap (lightButton y) >> row [ spacing 8 ]
 
 
 lightButton : Int -> Int -> Bool -> Element Msg
@@ -100,7 +173,7 @@ lightButton y x isOn =
         [ Background.color <| lightColor isOn
         , width <| px 100
         , height <| px 100
-        , onClick <| ToggleLight x y
+        , Events.onClick <| ToggleLight x y
         , Border.rounded 10
         ]
         none
