@@ -110,11 +110,16 @@ update msg model =
                 , gameState = Playing
                 , numSeedMoves = List.length coordList
               }
-            , getStartTime
+            , Cmd.none
             )
 
         NewGame ->
-            ( { initialModel | gameState = Setup }
+            ( { model
+                | gameState = Setup
+                , board = initialBoard
+                , numMovesMade = 0
+                , numSeedMoves = 0
+              }
             , Random.generate SeedBoard (coordListGenerator model.board)
             )
 
@@ -124,15 +129,15 @@ update msg model =
                     ( { model | currentTime = currentTime }, Cmd.none )
 
                 _ ->
-                    ( model, Cmd.none )
+                    ( { model
+                        | currentTime = currentTime
+                        , startTime = currentTime
+                      }
+                    , Cmd.none
+                    )
 
         UpdateStartTime startTime ->
             ( { model | startTime = startTime }, Cmd.none )
-
-
-getStartTime : Cmd Msg
-getStartTime =
-    Time.now |> Task.perform UpdateStartTime
 
 
 getGameState : Board -> GameState
@@ -248,14 +253,28 @@ sidebar model =
     column
         [ height fill, spacing 8 ]
         [ el [ Font.size 40 ] <| text "lights out"
-        , Input.button [] { onPress = Just NewGame, label = text "new game" }
+        , Input.button
+            [ centerY, Font.size 24, mouseOver [ Font.glow brightGreen 0.5 ] ]
+            { onPress = Just NewGame, label = text "new game" }
         , stats model
+        , credits
 
-        -- TODO: add credits
-        -- , Input.button [] { onPress = Nothing, label = text "credits" }
         -- TODO: add user auth
         --, Input.button [ alignBottom ] { onPress = Nothing, label = text "sign in" }
-        -- TODO: add link to source
+        ]
+
+
+credits : Element Msg
+credits =
+    column [ alignBottom ]
+        [ link []
+            { url = "https://a-b.sh"
+            , label = text "a-b.sh"
+            }
+        , link []
+            { url = "https://github.com/albronca/lights-out"
+            , label = text "source code"
+            }
         ]
 
 
@@ -287,7 +306,7 @@ haiku =
 stats : Model -> Element Msg
 stats model =
     column
-        [ alignBottom, spacing 8 ]
+        [ centerY, spacing 8 ]
         [ text <| "moves:" ++ String.fromInt model.numMovesMade
         , text <| "goal:" ++ String.fromInt model.numSeedMoves
         , timer model
