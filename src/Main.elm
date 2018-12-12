@@ -12,7 +12,6 @@ import Html exposing (Html)
 import List.Extra
 import Matrix exposing (Matrix)
 import Random
-import Time exposing (..)
 
 
 main : Program () Model Msg
@@ -44,8 +43,6 @@ type alias Model =
     , board : Board
     , numSeedMoves : Int
     , numMovesMade : Int
-    , startTime : Posix
-    , currentTime : Posix
     }
 
 
@@ -60,8 +57,6 @@ initialModel =
     , board = initialBoard
     , numSeedMoves = 0
     , numMovesMade = 0
-    , startTime = millisToPosix 0
-    , currentTime = millisToPosix 0
     }
 
 
@@ -78,8 +73,6 @@ type Msg
     = ToggleLight Int Int
     | NewGame
     | SeedBoard (List ( Int, Int ))
-    | UpdateCurrentTime Posix
-    | UpdateStartTime Posix
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -121,22 +114,6 @@ update msg model =
               }
             , Random.generate SeedBoard (coordListGenerator model.board)
             )
-
-        UpdateCurrentTime currentTime ->
-            case model.gameState of
-                Playing ->
-                    ( { model | currentTime = currentTime }, Cmd.none )
-
-                _ ->
-                    ( { model
-                        | currentTime = currentTime
-                        , startTime = currentTime
-                      }
-                    , Cmd.none
-                    )
-
-        UpdateStartTime startTime ->
-            ( { model | startTime = startTime }, Cmd.none )
 
 
 getGameState : Board -> GameState
@@ -211,7 +188,7 @@ coordGenerator maxX maxY =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    every 100 UpdateCurrentTime
+    Sub.none
 
 
 
@@ -308,26 +285,7 @@ stats model =
         [ centerY, spacing 8 ]
         [ text <| "moves:" ++ String.fromInt model.numMovesMade
         , text <| "goal:" ++ String.fromInt model.numSeedMoves
-        , timer model
         ]
-
-
-timer : Model -> Element Msg
-timer model =
-    let
-        timeDiff =
-            posixToMillis model.currentTime
-                - posixToMillis model.startTime
-                |> millisToPosix
-    in
-    (String.padLeft 2 '0' <| String.fromInt (toHour utc timeDiff))
-        ++ ":"
-        ++ (String.padLeft 2 '0' <| String.fromInt (toMinute utc timeDiff))
-        ++ ":"
-        ++ (String.padLeft 2 '0' <| String.fromInt (toSecond utc timeDiff))
-        ++ "."
-        ++ String.fromInt (toMillis utc timeDiff // 100)
-        |> text
 
 
 rows : Matrix a -> List (List a)
