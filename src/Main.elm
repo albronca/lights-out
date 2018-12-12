@@ -12,7 +12,6 @@ import Html exposing (Html)
 import List.Extra
 import Matrix exposing (Matrix)
 import Random
-import Task
 import Time exposing (..)
 
 
@@ -196,7 +195,7 @@ coordListGenerator matrix =
         maxCount =
             width * height
     in
-    Random.int 0 maxCount
+    Random.int 5 maxCount
         |> Random.andThen (\len -> Random.list len (coordGenerator maxX maxY))
         |> Random.map List.Extra.unique
 
